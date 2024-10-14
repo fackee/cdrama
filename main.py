@@ -5,6 +5,7 @@ import json
 import cv2
 import io
 from qwen import Qwen2VLTool
+from openai import OpenAI
 
 extract_subtile_prompt = '''
 该图片是短剧的视频帧，识别出图片中的字幕。输出格式严格按照下面的json格式输出。
@@ -16,17 +17,46 @@ extract_subtile_prompt = '''
 
 translate_promot = '''你现在是一个专业的字幕翻译师, 你需要将这篇短剧的字幕由 %s 翻译成 %s. 特别注意，你只需要输出翻译后的内容，不要输出与原文翻译无关的内容。
 '''
+client = OpenAI(
+    api_key= 'sk-01541446af8a40c6833153cab7f06a2c', # 如果您没有配置环境变量，请在此处用您的API Key进行替换
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+)
 
 
-def translate_text_by_qwen(text, messages,qwen:Qwen2VLTool):
-    # 添加用户输入到消息历史
-    print(messages)
-    messages.append({"role": "user", "content": text})
+def truncate_array(arr, num_tail_items=99):
+    """
+    截取数组的第一条和指定数量的倒数条目。
+
+    :param arr: 输入数组
+    :param num_tail_items: 要截取的倒数条目数量，默认为99
+    :return: 截取后的数组
+    """
+    if not arr:
+        return []
     
-    # 调用qwen进行翻译
-    inputs = qwen.process_messages(messages)
-    # 获取翻译结果
-    translation = qwen.generate_output(inputs)[0]
+    # 截取数组的第一条和指定数量的倒数条目
+    first_item = arr[:1]
+    last_items = arr[-num_tail_items:]
+    
+    # 如果数组长度小于等于指定的倒数条目数量，则返回整个数组
+    if len(arr) <= num_tail_items:
+        return arr
+    
+    # 否则，返回第一条和指定数量的倒数条目，去重合并
+    truncated_arr = first_item + last_items if first_item != last_items[:1] else last_items
+    
+    return truncated_arr
+
+def translate_text_by_qwen(text, messages):
+    # 添加用户输入到消息历史
+    messages.append({"role": "user", "content": text})
+    truncate_message = truncate_array(messages)
+    print(truncate_array)
+    completion = client.chat.completions.create(
+            model = 'qwen-max', 
+            messages = truncate_message
+    )
+    translation = completion.choices[0].message.content
     messages.append({"role": "assistant", "content": translation})
     return translation
 
