@@ -18,15 +18,15 @@ translate_promot = '''你现在是一个专业的字幕翻译师, 你需要将�
 '''
 
 
-def translate_text_with_chatgpt(text, messages,qwen:Qwen2VLTool):
+def translate_text_by_qwen(text, messages,qwen:Qwen2VLTool):
     # 添加用户输入到消息历史
     print(messages)
     messages.append({"role": "user", "content": text})
     
     # 调用qwen进行翻译
-    inputs = tool.process_messages(messages)
+    inputs = qwen.process_messages(messages)
     # 获取翻译结果
-    translation = tool.generate_output(inputs)[0]
+    translation = qwen.generate_output(inputs)[0]
     messages.append({"role": "assistant", "content": translation})
     return translation
 
@@ -49,7 +49,7 @@ def frame_to_base64(frame):
     
     return img_str
 
-def extract_text_from_frame(base64_image,qwen:Qwen2VLTool):
+def extract_text_from_frame_by_qwen(base64_image,qwen:Qwen2VLTool):
     message = [
         {
             "role": "user",
@@ -98,12 +98,12 @@ def extract_subtitles_from_video(qwen:Qwen2VLTool,video_path, output_file,frame_
             # 转换为PIL图像
             _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
             base64_frame = base64.b64encode(buffer).decode('utf-8')
-            text = extract_text_from_frame(base64_image=base64_frame,qwen=qwen)
+            text = extract_text_from_frame_by_qwen(base64_image=base64_frame,qwen=qwen)
             if text:
                 subtitle = json.loads(text.strip('```json').strip('```').strip())
                 if subtitle['hasSubtitle'] == True:
                     subtitle_text = subtitle['subTitle']
-                    translated_text = translate_text_with_chatgpt(subtitle_text, messages,qwen=qwen)
+                    translated_text = translate_text_by_qwen(subtitle_text, messages,qwen=qwen)
                     if translated_text:
                         print(str(index) + ": " + subtitle_text + " ---- " + translated_text)
                         # 创建字幕条目
