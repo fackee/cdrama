@@ -128,8 +128,8 @@ def extract_subtitles_from_video(video_path, output_file,per_frame=30,src_lang='
 
 
 # 替换为你的帧文件夹路径和输出字幕文件路径
-video_path = 'asserts/short_drama.mp4'
-output_subtitle_file_path = 'asserts/output_subtitle_file_1.srt'
+video_path = './asserts/short_drama.mp4'
+output_subtitle_file_path = './asserts/output_subtitle_file.srt'
 model_path = "/data/models/Qwen2-VL-7B-Instruct/"
 processor_path = "/data/models/Qwen2-VL-7B-Instruct/"
 tool = Qwen2VLTool(model_path, processor_path, torch_dtype="auto", device_map="auto", attn_implementation="flash_attention_2")
