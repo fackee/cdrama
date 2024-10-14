@@ -74,13 +74,16 @@ def extract_text_from_frame(base64_image,qwen:Qwen2VLTool):
     input = qwen.process_messages(messages=message)
     return qwen.generate_output(inputs=input)[0]
 
-def extract_subtitles_from_video(video_path, output_file,per_frame=30,src_lang='中文', dest_lang='英文'):
+def extract_subtitles_from_video(video_path, output_file,frame_rate=1,src_lang='中文', dest_lang='英文'):
     """
     从视频中提取字幕并保存到文件
     """
     # 打开视频文件
     cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_interval = int(fps / frame_rate)
     frame_count = 0
+    saved_frame_count = 0
     # 初始化消息历史
     messages = [
         {"role": "system", "content": translate_promot % (src_lang, dest_lang)}
@@ -96,13 +99,12 @@ def extract_subtitles_from_video(video_path, output_file,per_frame=30,src_lang='
         if not ret:
             break
 
-        frame_count += 1
-
         # 每隔一定帧数进行一次识别
-        if frame_count % per_frame == 0:
+        if frame_count % frame_interval == 0:
             # 转换为PIL图像
-            img_base64 = frame_to_base64(frame)
-            text = extract_text_from_frame(base64_image=img_base64)
+            _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+            base64_frame = base64.b64encode(buffer).decode('utf-8')
+            text = extract_text_from_frame(base64_image=base64_frame)
             if text:
                 subtitle = json.loads(text.strip('```json').strip('```').strip())
                 if subtitle['hasSubtitle'] == True:
@@ -116,7 +118,8 @@ def extract_subtitles_from_video(video_path, output_file,per_frame=30,src_lang='
                         sub = pysrt.SubRipItem(index + 1, start=start_time, end=end_time, text=translated_text)
                         subs.append(sub)
                         index += 1
-
+        frame_count += 1
+        
     # 释放视频捕获对象
     cap.release()
 
