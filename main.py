@@ -47,6 +47,16 @@ def truncate_array(arr, num_tail_items=99):
     
     return truncated_arr
 
+def translate_text_by_qwen_local(text, messages,qwen:Qwen2VLTool):
+    # 添加用户输入到消息历史
+    messages.append({"role": "user", "content": text})
+    truncate_message = truncate_array(messages)
+    print(truncate_array)
+    input = qwen.process_messages(messages=truncate_message)
+    translation = qwen.generate_output(inputs=input)[0]
+    messages.append({"role": "assistant", "content": translation})
+    return translation
+
 def translate_text_by_qwen(text, messages):
     # 添加用户输入到消息历史
     messages.append({"role": "user", "content": text})
@@ -133,7 +143,7 @@ def extract_subtitles_from_video(qwen:Qwen2VLTool,video_path, output_file,frame_
                 subtitle = json.loads(text.strip('```json').strip('```').strip())
                 if subtitle['hasSubtitle'] == True:
                     subtitle_text = subtitle['subTitle']
-                    translated_text = translate_text_by_qwen(subtitle_text, messages)
+                    translated_text = translate_text_by_qwen_local(subtitle_text, messages,qwen=qwen)
                     if translated_text:
                         print(str(index) + ": " + subtitle_text + " ---- " + translated_text)
                         # 创建字幕条目
