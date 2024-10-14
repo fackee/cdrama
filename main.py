@@ -133,7 +133,7 @@ def extract_subtitles_from_video(qwen:Qwen2VLTool,video_path, output_file,frame_
                 subtitle = json.loads(text.strip('```json').strip('```').strip())
                 if subtitle['hasSubtitle'] == True:
                     subtitle_text = subtitle['subTitle']
-                    translated_text = translate_text_by_qwen(subtitle_text, messages,qwen=qwen)
+                    translated_text = translate_text_by_qwen(subtitle_text, messages)
                     if translated_text:
                         print(str(index) + ": " + subtitle_text + " ---- " + translated_text)
                         # 创建字幕条目
