@@ -37,29 +37,5 @@ class Qwen2VLTool:
         output_text = self.processor.batch_decode(
             generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )
-        print("qwen reponse: " + output_text)
+        print("qwen reponse: " + str(output_text))
         return output_text
-
-# 使用示例
-if __name__ == "__main__":
-    model_path = "/data/models/Qwen2-VL-7B-Instruct/"
-    processor_path = "/data/models/Qwen2-VL-7B-Instruct/"
-    
-    tool = Qwen2VLTool(model_path, processor_path, torch_dtype="auto", device_map="auto", attn_implementation="flash_attention_2")
-    
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "image": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg",
-                },
-                {"type": "text", "text": "Describe this image."},
-            ],
-        }
-    ]
-    
-    inputs = tool.process_messages(messages)
-    output_text = tool.generate_output(inputs)
-    print(output_text)
