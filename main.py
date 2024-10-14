@@ -70,7 +70,7 @@ def extract_text_from_frame(base64_image,qwen:Qwen2VLTool):
     input = qwen.process_messages(messages=message)
     return qwen.generate_output(inputs=input)[0]
 
-def extract_subtitles_from_video(video_path, output_file,frame_rate=1,src_lang='中文', dest_lang='英文'):
+def extract_subtitles_from_video(qwen:Qwen2VLTool,video_path, output_file,frame_rate=1,src_lang='中文', dest_lang='英文'):
     """
     从视频中提取字幕并保存到文件
     """
@@ -100,12 +100,12 @@ def extract_subtitles_from_video(video_path, output_file,frame_rate=1,src_lang='
             # 转换为PIL图像
             _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
             base64_frame = base64.b64encode(buffer).decode('utf-8')
-            text = extract_text_from_frame(base64_image=base64_frame)
+            text = extract_text_from_frame(base64_image=base64_frame,qwen=qwen)
             if text:
                 subtitle = json.loads(text.strip('```json').strip('```').strip())
                 if subtitle['hasSubtitle'] == True:
                     subtitle_text = subtitle['subTitle']
-                    translated_text = translate_text_with_chatgpt(subtitle_text, messages)
+                    translated_text = translate_text_with_chatgpt(subtitle_text, messages,qwen=qwen)
                     if translated_text:
                         print(str(index) + ": " + subtitle_text + " ---- " + translated_text)
                         # 创建字幕条目
@@ -131,6 +131,6 @@ video_path = './asserts/short_drama.mp4'
 output_subtitle_file_path = './asserts/output_subtitle_file.srt'
 model_path = "/data/models/Qwen2-VL-7B-Instruct/"
 processor_path = "/data/models/Qwen2-VL-7B-Instruct/"
-tool = Qwen2VLTool(model_path, processor_path, torch_dtype="auto", device_map="auto", attn_implementation="flash_attention_2")
+qwen = Qwen2VLTool(model_path, processor_path, torch_dtype="auto", device_map="auto", attn_implementation="flash_attention_2")
 
-extract_subtitles_from_video(video_path, output_subtitle_file_path)
+extract_subtitles_from_video(qwen=qwen,video_path=video_path, output_file=output_subtitle_file_path)
