@@ -8,14 +8,14 @@ from qwen import Qwen2VLTool
 from openai import OpenAI
 
 extract_subtile_prompt = '''
-该图片是短剧的视频帧，识别出图片中的字幕。输出格式严格按照下面的json格式输出。
+该图片是一步古装穿越短剧的视频帧，识别出图片中的字幕。输出格式严格按照下面的json格式输出。
 <format>
 {'hasSubtitle': $HASSUBTITLE # true or false,'subTitle': $SUBTITLE}
 </format>
 注意，如果你遇到模棱两可的翻译选择，结合上下文选择你认为最合适的输出就可以，不要让我选择。
 '''
 
-translate_promot = '''你现在是一个专业的字幕翻译师, 你需要将这篇短剧的字幕由 %s 翻译成 %s. 特别注意，你只需要输出翻译后的内容，不要输出与原文翻译无关的内容。
+translate_promot = '''你现在是一个专业的字幕翻译师, 你需要将这篇古装穿越电视剧的字幕由 %s 翻译成 %s. 特别注意，你只需要输出翻译后的内容，不要输出与原文翻译无关的内容。
 '''
 client = OpenAI(
     api_key= 'sk-01541446af8a40c6833153cab7f06a2c', # 如果您没有配置环境变量，请在此处用您的API Key进行替换
