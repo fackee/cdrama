@@ -1,12 +1,8 @@
-import os
 from PIL import Image
 import pysrt
 import base64
-from openai import OpenAI
 import json
-import time
 import cv2
-import numpy as np
 import io
 from qwen import Qwen2VLTool
 
@@ -119,7 +115,7 @@ def extract_subtitles_from_video(video_path, output_file,frame_rate=1,src_lang='
                         subs.append(sub)
                         index += 1
         frame_count += 1
-        
+
     # 释放视频捕获对象
     cap.release()
 
