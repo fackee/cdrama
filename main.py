@@ -60,7 +60,7 @@ def extract_text_from_frame(base64_image,qwen:Qwen2VLTool):
             },
             {
                 "type": "image",
-                "image": base64_image
+                "image": f'data:image;base64,{base64_image}'
             }
             ]
         }
