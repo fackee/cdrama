@@ -4,8 +4,8 @@ import base64
 import json
 import cv2
 import io
-from qwen import Qwen2VLTool
 from openai import OpenAI
+import requests
 
 extract_subtile_prompt = '''
 该图片是一步古装穿越短剧的视频帧，识别出图片中的字幕。输出格式严格按照下面的json格式输出。
@@ -21,6 +21,19 @@ client = OpenAI(
     api_key= 'sk-01541446af8a40c6833153cab7f06a2c', # 如果您没有配置环境变量，请在此处用您的API Key进行替换
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
 )
+
+
+# API URL
+url = "http://localhost/generate"
+
+# API密钥
+api_key = "Zjx7532554!"
+
+# 请求头
+headers = {
+    "Content-Type": "application/json",
+    "x-api-key": api_key
+}
 
 
 def truncate_array(arr, num_tail_items=99):
@@ -47,21 +60,11 @@ def truncate_array(arr, num_tail_items=99):
     
     return truncated_arr
 
-def translate_text_by_qwen_local(text, messages,qwen:Qwen2VLTool):
-    # 添加用户输入到消息历史
-    messages.append({"role": "user", "content": text})
-    truncate_message = truncate_array(messages)
-    print(truncate_array)
-    input = qwen.process_messages(messages=truncate_message)
-    translation = qwen.generate_output(inputs=input)[0]
-    messages.append({"role": "assistant", "content": translation})
-    return translation
-
 def translate_text_by_qwen(text, messages):
     # 添加用户输入到消息历史
     messages.append({"role": "user", "content": text})
     truncate_message = truncate_array(messages)
-    print(truncate_array)
+    print(messages)
     completion = client.chat.completions.create(
             model = 'qwen-max', 
             messages = truncate_message
@@ -89,7 +92,7 @@ def frame_to_base64(frame):
     
     return img_str
 
-def extract_text_from_frame_by_qwen(base64_image,qwen:Qwen2VLTool):
+def extract_text_from_frame_by_qwen(base64_image):
     message = [
         {
             "role": "user",
@@ -105,10 +108,14 @@ def extract_text_from_frame_by_qwen(base64_image,qwen:Qwen2VLTool):
             ]
         }
     ]
-    input = qwen.process_messages(messages=message)
-    return qwen.generate_output(inputs=input)[0]
+    response = requests.post(url, headers=headers, data=json.dumps(message))
+    # 打印响应
+    if response.status_code == 200:
+        print("Response:", response.json())
+    else:
+        print("Error:", response.status_code, response.text)
 
-def extract_subtitles_from_video(qwen:Qwen2VLTool,video_path, output_file,frame_rate=1,src_lang='中文', dest_lang='英文'):
+def extract_subtitles_from_video(video_path, output_file,frame_rate=1,src_lang='中文', dest_lang='英文'):
     """
     从视频中提取字幕并保存到文件
     """
@@ -138,12 +145,12 @@ def extract_subtitles_from_video(qwen:Qwen2VLTool,video_path, output_file,frame_
             # 转换为PIL图像
             _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
             base64_frame = base64.b64encode(buffer).decode('utf-8')
-            text = extract_text_from_frame_by_qwen(base64_image=base64_frame,qwen=qwen)
+            text = extract_text_from_frame_by_qwen(base64_image=base64_frame)
             if text:
                 subtitle = json.loads(text.strip('```json').strip('```').strip())
                 if subtitle['hasSubtitle'] == True:
                     subtitle_text = subtitle['subTitle']
-                    translated_text = translate_text_by_qwen_local(subtitle_text, messages,qwen=qwen)
+                    translated_text = translate_text_by_qwen_local(subtitle_text, messages)
                     if translated_text:
                         print(str(index) + ": " + subtitle_text + " ---- " + translated_text)
                         # 创建字幕条目
@@ -165,10 +172,14 @@ def extract_subtitles_from_video(qwen:Qwen2VLTool,video_path, output_file,frame_
 
 
 # 替换为你的帧文件夹路径和输出字幕文件路径
-video_path = './asserts/short_drama.mp4'
-output_subtitle_file_path = './asserts/output_subtitle_file.srt'
-model_path = "/data/models/Qwen2-VL-7B-Instruct/"
-processor_path = "/data/models/Qwen2-VL-7B-Instruct/"
-qwen = Qwen2VLTool(model_path, processor_path, torch_dtype="auto", device_map="auto", attn_implementation="flash_attention_2")
+# video_path = './asserts/short_drama.mp4'
+# output_subtitle_file_path = './asserts/output_subtitle_file.srt'
+# model_path = "/data/models/Qwen2-VL-7B-Instruct/"
+# processor_path = "/data/models/Qwen2-VL-7B-Instruct/"
+# qwen = Qwen2VLTool(model_path, processor_path, torch_dtype="auto", device_map="auto", attn_implementation="flash_attention_2")
 
-extract_subtitles_from_video(qwen=qwen,video_path=video_path, output_file=output_subtitle_file_path)
+# extract_subtitles_from_video(qwen=qwen,video_path=video_path, output_file=output_subtitle_file_path)
+
+arr = [1,2,3,4,5]
+t_arr = truncate_array(arr=arr)
+print(t_arr)

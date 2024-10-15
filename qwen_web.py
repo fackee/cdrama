@@ -49,8 +49,8 @@ class Qwen2VLTool:
         return output_text
 
 # 初始化模型和处理器
-model_path = "/path/to/your/local/model"
-processor_path = "/path/to/your/local/processor"
+model_path = "/data/models/Qwen2-VL-7B-Instruct/"
+processor_path = "/data/models/Qwen2-VL-7B-Instruct/"
 qwen_tool = Qwen2VLTool(model_path, processor_path)
 
 # 鉴权装饰器
