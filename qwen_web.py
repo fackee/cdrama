@@ -11,7 +11,7 @@ API_KEY = "Zjx7532554!"
 
 # 初始化Qwen2VL工具类
 class Qwen2VLTool:
-    def __init__(self, model_path, processor_path, torch_dtype="torch.bfloat16", device_map="auto", attn_implementation="flash_attention_2"):
+    def __init__(self, model_path, processor_path, torch_dtype=torch.bfloat16, device_map="auto", attn_implementation="flash_attention_2"):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
         # 加载模型
