@@ -24,7 +24,7 @@ client = OpenAI(
 
 
 # API URL
-url = "http://localhost/generate"
+url = "http://117.50.193.126/generate"
 
 # API密钥
 api_key = "Zjx7532554!"
@@ -108,12 +108,16 @@ def extract_text_from_frame_by_qwen(base64_image):
             ]
         }
     ]
-    response = requests.post(url, headers=headers, data=json.dumps(message))
+    request_body = {"messages":message}
+    response = requests.post(url, headers=headers, data=json.dumps(request_body))
     # 打印响应
     if response.status_code == 200:
-        print("Response:", response.json())
+        outputs = response.json()
+        print("Response:", outputs)
+        return outputs["output"][0]
     else:
         print("Error:", response.status_code, response.text)
+        return ""
 
 def extract_subtitles_from_video(video_path, output_file,frame_rate=1,src_lang='中文', dest_lang='英文'):
     """
@@ -145,20 +149,23 @@ def extract_subtitles_from_video(video_path, output_file,frame_rate=1,src_lang='
             # 转换为PIL图像
             _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
             base64_frame = base64.b64encode(buffer).decode('utf-8')
-            text = extract_text_from_frame_by_qwen(base64_image=base64_frame)
-            if text:
-                subtitle = json.loads(text.strip('```json').strip('```').strip())
-                if subtitle['hasSubtitle'] == True:
-                    subtitle_text = subtitle['subTitle']
-                    translated_text = translate_text_by_qwen_local(subtitle_text, messages)
-                    if translated_text:
-                        print(str(index) + ": " + subtitle_text + " ---- " + translated_text)
-                        # 创建字幕条目
-                        start_time = pysrt.SubRipTime(0, 0, index)
-                        end_time = pysrt.SubRipTime(0, 0, index + 1)
-                        sub = pysrt.SubRipItem(index + 1, start=start_time, end=end_time, text=translated_text)
-                        subs.append(sub)
-                        index += 1
+            try:
+                text = extract_text_from_frame_by_qwen(base64_image=base64_frame)
+                if text:
+                    subtitle = json.loads(text.strip('```json').strip('```').strip())
+                    if subtitle['hasSubtitle'] == True:
+                        subtitle_text = subtitle['subTitle']
+                        translated_text = translate_text_by_qwen(subtitle_text, messages)
+                        if translated_text:
+                            print(str(index) + ": " + subtitle_text + " ---- " + translated_text)
+                            # 创建字幕条目
+                            start_time = pysrt.SubRipTime(0, 0, index)
+                            end_time = pysrt.SubRipTime(0, 0, index + 1)
+                            sub = pysrt.SubRipItem(index + 1, start=start_time, end=end_time, text=translated_text)
+                            subs.append(sub)
+                            index += 1
+            except Exception as e:
+                print(e) 
         frame_count += 1
 
     # 释放视频捕获对象
@@ -172,14 +179,7 @@ def extract_subtitles_from_video(video_path, output_file,frame_rate=1,src_lang='
 
 
 # 替换为你的帧文件夹路径和输出字幕文件路径
-# video_path = './asserts/short_drama.mp4'
-# output_subtitle_file_path = './asserts/output_subtitle_file.srt'
-# model_path = "/data/models/Qwen2-VL-7B-Instruct/"
-# processor_path = "/data/models/Qwen2-VL-7B-Instruct/"
-# qwen = Qwen2VLTool(model_path, processor_path, torch_dtype="auto", device_map="auto", attn_implementation="flash_attention_2")
+video_path = './asserts/short_drama.mp4'
+output_subtitle_file_path = './asserts/output_subtitle_file.srt'
 
-# extract_subtitles_from_video(qwen=qwen,video_path=video_path, output_file=output_subtitle_file_path)
-
-arr = [1,2,3,4,5]
-t_arr = truncate_array(arr=arr)
-print(t_arr)
+extract_subtitles_from_video(video_path=video_path, output_file=output_subtitle_file_path)

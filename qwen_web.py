@@ -11,7 +11,7 @@ API_KEY = "Zjx7532554!"
 
 # 初始化Qwen2VL工具类
 class Qwen2VLTool:
-    def __init__(self, model_path, processor_path, torch_dtype="auto", device_map="auto", attn_implementation=None):
+    def __init__(self, model_path, processor_path, torch_dtype="torch.bfloat16", device_map="auto", attn_implementation="flash_attention_2"):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
         # 加载模型
@@ -51,6 +51,7 @@ class Qwen2VLTool:
 # 初始化模型和处理器
 model_path = "/data/models/Qwen2-VL-7B-Instruct/"
 processor_path = "/data/models/Qwen2-VL-7B-Instruct/"
+torch.cuda.empty_cache()
 qwen_tool = Qwen2VLTool(model_path, processor_path)
 
 # 鉴权装饰器
