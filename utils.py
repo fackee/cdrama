@@ -10,8 +10,13 @@ from config import Config
 import os
 from bs4 import BeautifulSoup
 import re
+import threading
 
+
+tlock = threading.Lock()
 client = OpenAI(api_key=Config.API_KEY, http_client=httpx.Client(proxies=Config.PROXIES))
+
+qw_cloud_client = OpenAI(api_key=Config.QWEN_CLOUD_API_KEY, base_url=Config.QWEN_CLOUD_BASE_URL)
 
 
 def get_movie_info(subject_id):
@@ -28,6 +33,12 @@ def get_movie_info(subject_id):
         print(f"Failed to retrieve data from https://movie.douban.com/subject/{subject_id}/")
         return None
 
+movie_info = get_movie_info(subject_id='37039038')
+translate_system_prompt = Config.translate_prompt(movie_info=movie_info)
+messages = [{"role": "system", "content": translate_system_prompt}]
+
+
+
 def truncate_array(arr, num_tail_items=99):
     if not arr:
         return []
@@ -38,23 +49,57 @@ def truncate_array(arr, num_tail_items=99):
     truncated_arr = first_item + last_items if first_item != last_items[:1] else last_items
     return truncated_arr
 
-def translate_text_by_openai(text, messages):
-    messages.append({"role": "user", "content": text})
+def translate_text_by_openai(text):
+    with tlock:
+        messages.append({"role": "user", "content": text})
     truncate_message = truncate_array(messages)
     completion = client.chat.completions.create(
         model='gpt-4o-mini',
         messages=truncate_message
     )
     translation = completion.choices[0].message.content
-    messages.append({"role": "assistant", "content": translation})
+    with tlock:
+        messages.append({"role": "assistant", "content": translation})
     return translation
 
-def frame_to_base64(frame):
-    pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-    buffered = io.BytesIO()
-    pil_image.save(buffered, format="JPEG")
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    return img_str
+def frame_to_base64(frame,compress_rate = 50):
+    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), compress_rate]  # 90表示压缩质量
+    result, encimg = cv2.imencode('.jpg', frame, encode_param)
+    if not result:
+        print("Error: Could not encode frame.")
+        return None
+
+    # 将JPEG数据转换为字节流
+    jpeg_bytes = encimg.tobytes()
+
+    # 将字节流转换为Base64编码
+    base64_str = base64.b64encode(jpeg_bytes).decode('utf-8')
+    return base64_str
+
+# 28 * 28 = 1token
+# 270 * 480 = 165 token
+# 300token/frame
+# 1min = 15000 token
+# 1hour = 900000 token
+# 1 drama = 1800000 token
+# 0.000008y/token
+# 1drama = 14.4
+# QPM = 60
+def extract_text_from_frame_by_qwen_cloud(base64_image):
+    message = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": Config.EXTRACT_SUBTITLE_PROMPT},
+                {"type": "image", "image": f'data:image;base64,{base64_image}'}
+            ]
+        }
+    ]
+    completion = qw_cloud_client.chat.completions.create(
+    model="qwen-vl-plus", # 模型列表：https://help.aliyun.com/zh/model-studio/getting-started/models
+    messages=message
+    )
+    return json.loads(completion.choices[0].message.content.strip('```json').strip('```').strip())
 
 def extract_text_from_frame_by_qwen(base64_image):
     message = [

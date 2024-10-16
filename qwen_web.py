@@ -25,7 +25,7 @@ class Qwen2VLTool:
         # 加载处理器
         self.processor = AutoProcessor.from_pretrained(processor_path)
     
-    def process_messages(self, messages):
+    def process_inference(self, messages):
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         image_inputs, video_inputs = process_vision_info(messages)
         inputs = self.processor(
@@ -36,6 +36,19 @@ class Qwen2VLTool:
             return_tensors="pt",
         )
         return inputs.to(self.device)
+    
+    def process_batch_inference(self,batch_messages):
+        texts = [self.processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True)for msg in batch_messages]
+        image_inputs, video_inputs = self.process_vision_info(batch_messages)
+        inputs = self.processor(
+            text=texts,
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+        )
+        inputs = inputs.to("cuda")
+
     
     def generate_output(self, inputs, max_new_tokens=128):
         generated_ids = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
@@ -53,6 +66,11 @@ model_path = "/data/models/Qwen2-VL-7B-Instruct/"
 processor_path = "/data/models/Qwen2-VL-7B-Instruct/"
 torch.cuda.empty_cache()
 qwen_tool = Qwen2VLTool(model_path, processor_path)
+
+def is_2d_array(arr):
+    if isinstance(arr, list) and all(isinstance(i, list) for i in arr):
+        return True
+    return False
 
 # 鉴权装饰器
 def require_api_key(func):
@@ -73,7 +91,10 @@ def generate():
     
     messages = data['messages']
     try:
-        inputs = qwen_tool.process_messages(messages)
+        if is_2d_array(messages):
+          inputs = qwen_tool.process_inference(messages)
+        else:
+            inputs = qwen_tool.process_batch_inference(messages)
         output = qwen_tool.generate_output(inputs)
         return jsonify({"output": output})
     except Exception as e:
