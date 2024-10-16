@@ -9,11 +9,12 @@ import time
 
 lock = threading.Lock()
 
-
-def extract_subtitle_task(frame_count,frame_base64,subtitle_array):
+def extract_subtitle_task(frame_count,base64_frame,subtitle_array):
     try:
-        text = extract_text_from_frame_by_qwen(base64_image=frame_base64)
+        text = extract_text_from_frame_by_qwen(base64_frame=base64_frame)
+        # text = text.replace("'","\"")
         clean_text = text.strip('```json').strip('```').strip()
+        # clean_text = clean_text.strip('<format>\n').strip('\n</format>').strip()
         obj = json.loads(clean_text)
         if obj['hasSubtitle'] == True and obj['subTitle'] and len(obj['subTitle']) > 0:
             text = obj['subTitle'].strip()
@@ -24,8 +25,7 @@ def extract_subtitle_task(frame_count,frame_base64,subtitle_array):
         print(e)
         text = ""
     with lock:
-        if 0 <= frame_count < len(subtitle_array):  # 确保索引在有效范围内
-            subtitle_array[frame_count] = text
+        subtitle_array[frame_count] = text
 
 
 
@@ -39,21 +39,13 @@ def extract_subtitles_from_video(video_path,extract_subtitle_concurrent = 4,fram
     frame_count = 0
     futures = []
     start_time = int(time.time())
-    last_base64 = ""
     with concurrent.futures.ThreadPoolExecutor(max_workers=extract_subtitle_concurrent) as executor:
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
-            print(f'handled: {frame_count} , left: {total_frames - frame_count}')
-            # if frame_count % 1 == 0: 
             base64_frame = frame_to_base64(frame,compress_rate=50)
-            if last_base64 == base64_frame:
-                print("duplicate")
-            else:
-                last_base64 = base64_frame
-            # 创建线程池处理视频帧
-            futures.append(executor.submit(extract_subtitle_task,frame_count,base64_frame,subtitle_array))
+            futures.append(executor.submit(extract_subtitle_task,frame_count,base64_frame,subtitle_array)) 
             frame_count += 1
     concurrent.futures.wait(futures)
     current_time = int(time.time())

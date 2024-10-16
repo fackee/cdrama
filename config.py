@@ -2,11 +2,11 @@ import os
 
 # 配置文件
 class Config:
-    
+
     QWEN_CLOUD_BASE_URL = os.getenv('QW_B_U', 'https://dashscope.aliyuncs.com/compatible-mode/v1')
 
 
-    
+
     API_URL = 'https://api.openai.com/v1/chat/completions'
     PROXIES = {
         "http://": "http://127.0.0.1:8118",
@@ -23,7 +23,7 @@ class Config:
     你现在是一个专业的字幕翻译师, 你需要根据影视剧信息，将剧中的字幕由中文翻译成英文。 特别注意，你只需要输出翻译后的内容，不要输出与原文翻译无关的内容。
     '''
     API_URL_QWEN = "http://117.50.193.126/generate"
-    
+    API_KEY_QWEN = "Zjx7532554!"
 
     def translate_prompt(movie_info):
         if movie_info:

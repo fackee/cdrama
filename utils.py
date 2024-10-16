@@ -101,13 +101,14 @@ def extract_text_from_frame_by_qwen_cloud(base64_image):
     )
     return json.loads(completion.choices[0].message.content.strip('```json').strip('```').strip())
 
-def extract_text_from_frame_by_qwen(base64_image):
+
+def extract_text_from_frame_by_qwen(base64_frame):
     message = [
         {
             "role": "user",
             "content": [
                 {"type": "text", "text": Config.EXTRACT_SUBTITLE_PROMPT},
-                {"type": "image", "image": f'data:image;base64,{base64_image}'}
+                {"type": "image", "image": f'data:image;base64,{base64_frame}'}
             ]
         }
     ]

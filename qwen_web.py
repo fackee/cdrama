@@ -38,8 +38,11 @@ class Qwen2VLTool:
         return inputs.to(self.device)
     
     def process_batch_inference(self,batch_messages):
-        texts = [self.processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True)for msg in batch_messages]
-        image_inputs, video_inputs = self.process_vision_info(batch_messages)
+        texts = [
+            self.processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True)
+            for msg in batch_messages
+        ]
+        image_inputs, video_inputs = process_vision_info(batch_messages)
         inputs = self.processor(
             text=texts,
             images=image_inputs,
@@ -48,6 +51,7 @@ class Qwen2VLTool:
             return_tensors="pt",
         )
         inputs = inputs.to("cuda")
+        return inputs.to(self.device)
 
     
     def generate_output(self, inputs, max_new_tokens=128):
@@ -92,12 +96,13 @@ def generate():
     messages = data['messages']
     try:
         if is_2d_array(messages):
-          inputs = qwen_tool.process_inference(messages)
+            inputs = qwen_tool.process_inference(messages)
         else:
             inputs = qwen_tool.process_batch_inference(messages)
         output = qwen_tool.generate_output(inputs)
         return jsonify({"output": output})
     except Exception as e:
+        print(e)
         return jsonify({"error": str(e)}), 500
 
 # 运行Flask应用
