@@ -15,7 +15,7 @@ def srt_to_vtt(srt_path, vtt_path):
         vtt_file.write(vtt_content)
 
 # 示例使用
-srt_path = '/Users/zhujianxin04/mini_drama/wk/merged_video.srt'
-vtt_path = '/Users/zhujianxin04/mini_drama/wk/merged_video.vtt'
+srt_path = '/Users/zhujianxin04/mini_drama/wk/1_subtitle.srt'
+vtt_path = '/Users/zhujianxin04/mini_drama/wk/1_subtitle.vtt'
 srt_to_vtt(srt_path, vtt_path)
 print(f'转换完成: {vtt_path}')
