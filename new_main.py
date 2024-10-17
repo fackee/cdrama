@@ -11,39 +11,29 @@ import time
 # 设置Tesseract的路径（如果需要）
 # pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract'
 
-def compress_and_encode_image(image, scale_factor=0.5, quality=85):
+def compress_and_encode_image(image):
     """
     按照比例压缩图片并返回Base64编码
     :param image: PIL Image对象
-    :param scale_factor: 压缩比例（0-1之间）
-    :param quality: 压缩质量
     :return: Base64编码的图片
     """
-    # 获取原始尺寸
-    original_size = image.size
-    
-    # 计算新的尺寸
-    new_size = (int(original_size[0] * scale_factor), int(original_size[1] * scale_factor))
-    
-    # 压缩图片
-    image = image.resize(new_size, Image.Resampling.LANCZOS)
     
     # 将图片保存到字节流
     buffered = BytesIO()
-    image.save(buffered, format="JPEG", quality=quality)
+    image.save(buffered, format="JPEG")
     
     # 获取字节流的Base64编码
     img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-    
     return img_str
 
-def extract_frames(video_path,frames_per_second=1,crop_area=(0, 0.65, 1, 0.15)):
+def extract_frames(video_path,frames_per_second=1,crop_area=(0, 0.61, 1, 0.14)):
     """
     提取关键帧和中间帧
     :param video_path: 视频路径
     :param frame_interval: 帧间隔
     :return: 帧列表和时间戳列表
     """
+    start_time = int(time.time())
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
 
@@ -70,6 +60,7 @@ def extract_frames(video_path,frames_per_second=1,crop_area=(0, 0.65, 1, 0.15)):
         success, frame = cap.read()
     
     cap.release()
+    print(f'extract frame from {video_path} cost: {int(time.time()) - start_time}')
     return frames, timestamps
 
 def detect_subtitles(frames, timestamps):
@@ -79,13 +70,14 @@ def detect_subtitles(frames, timestamps):
     :param timestamps: 时间戳列表
     :return: 字幕列表
     """
+    current_time = int(time.time())
     subtitles = []
     current_subtitle = None
     start_time = None
 
     for i, frame in enumerate(frames):
         image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        base64_image = compress_and_encode_image(image, scale_factor=0.5)
+        base64_image = compress_and_encode_image(image)
         
         etext = extract_text_from_frame_by_qwen(base64_image)
         clean_text = etext.strip('```json').strip('```').strip()
@@ -93,9 +85,9 @@ def detect_subtitles(frames, timestamps):
         if obj['hasSubtitle'] == True and obj['subTitle'] and len(obj['subTitle']) > 0:
             text = obj['subTitle'].strip()
             text = text.replace('，',' ')
+            print(f'{timestamps[i]}: {text}')
         else:
             text = None
-        print(f'{timestamps[i]}: {text}')
         if text and text != current_subtitle:
             if current_subtitle is not None:
                 end_time = timestamps[i-1]  # 上一帧的时间戳作为结束时间
@@ -116,15 +108,19 @@ def detect_subtitles(frames, timestamps):
         end_time = timestamps[-1]
         subtitles.append((start_time, end_time, current_subtitle))
 
+    print(f'detect subtile from cost: {int(time.time()) - current_time}')
     return subtitles
 
 def translate_subtitles(subtitles):
+    start_time = int(time.time())
     translate_subtitles = []
     for i, (start, end, subtitle) in enumerate(subtitles):
         translate_subtitle = translate_text_by_openai(text=subtitle)
         print(f'translate {start}-{end}: {subtitle} --- {translate_subtitle}')
         if translate_subtitle and len(translate_subtitle) > 0:
             translate_subtitles.append((start,end,translate_subtitle))
+
+    print(f'translate subtitle from cost: {int(time.time()) - start_time}')
     return translate_subtitles
 
 def format_time(milliseconds):
@@ -175,29 +171,27 @@ def embed_subtitle(video_path):
     os.system(f"ffmpeg -i {video_path} -vf subtitles={subtitle_path} {embed_video_path}")
 
 def start_single(video_path):
-    frames, timestamps = extract_frames(video_path, frames_per_second=8)
+    start_time = int(time.time())
+    frames, timestamps = extract_frames(video_path, frames_per_second=1)
     subtitles = detect_subtitles(frames, timestamps)
     backup_subtitles(video_path=video_path,subtitles=subtitles,translate=False)
     translated_subtitles = translate_subtitles(subtitles=subtitles)
     backup_subtitles(video_path=video_path,subtitles=translated_subtitles,translate=True)
     write_subtitles(video_path=video_path,subtitles=translated_subtitles)
     cvt_subtitle(video_path=video_path)
+    print(f'handle {video_path} cost: {int(time.time()) - start_time}')
 
-def list_video_files(directory, extensions=['.mp4', '.avi', '.mkv', '.mov', '.flv']):
+def start_batch(directory,extensions=['.mp4', '.avi', '.mkv', '.mov', '.flv']):
     video_files = []
     for root, _, files in os.walk(directory):
         for file in files:
             if any(file.lower().endswith(ext) for ext in extensions):
                 video_files.append(os.path.join(root, file))
-    return video_files
-
-def start_batch(directory):
-    video_files = list_video_files(directory)
+    video_files.sort(key=lambda x: os.path.basename(x).lower())
     for video_path in video_files:
         start_single(video_path=video_path)
 
 
 
 # 示例使用
-video_path = f'/Users/zhujianxin04/mini_drama/wk/1.mp4'
-start_batch('/Users/zhujianxin04/mini_drama/')
+start_batch('/Users/zhujianxin04/mini_drama/shcz')

@@ -2,7 +2,6 @@ import base64
 import json
 import requests
 from PIL import Image
-import io
 import cv2
 from openai import OpenAI
 import httpx
@@ -10,10 +9,8 @@ from config import Config
 import os
 from bs4 import BeautifulSoup
 import re
-import threading
 
 
-tlock = threading.Lock()
 client = OpenAI(api_key=Config.API_KEY, http_client=httpx.Client(proxies=Config.PROXIES))
 
 qw_cloud_client = OpenAI(api_key=Config.QWEN_CLOUD_API_KEY, base_url=Config.QWEN_CLOUD_BASE_URL)
@@ -33,7 +30,7 @@ def get_movie_info(subject_id):
         print(f"Failed to retrieve data from https://movie.douban.com/subject/{subject_id}/")
         return None
 
-movie_info = get_movie_info(subject_id='37039038')
+movie_info = ''
 translate_system_prompt = Config.translate_prompt(movie_info=movie_info)
 messages = [{"role": "system", "content": translate_system_prompt}]
 
@@ -50,16 +47,14 @@ def truncate_array(arr, num_tail_items=99):
     return truncated_arr
 
 def translate_text_by_openai(text):
-    with tlock:
-        messages.append({"role": "user", "content": text})
+    messages.append({"role": "user", "content": text})
     truncate_message = truncate_array(messages)
     completion = client.chat.completions.create(
         model='gpt-4o-mini',
         messages=truncate_message
     )
     translation = completion.choices[0].message.content
-    with tlock:
-        messages.append({"role": "assistant", "content": translation})
+    messages.append({"role": "assistant", "content": translation})
     return translation
 
 def frame_to_base64(frame,compress_rate = 50):
