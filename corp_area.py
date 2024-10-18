@@ -67,6 +67,13 @@ class VideoCropper(tk.Tk):
         end_x, end_y = (event.x, event.y)
         self.crop_area = (self.start_x, self.start_y, end_x, end_y)
         print(f"Crop area: {self.crop_area}")
+        x1, y1, x2, y2 = self.crop_area
+        x_ratio1 = x1 / 540
+        y_ratio1 = y1 / 960
+        x_ratio2 = x2 / 540
+        y_ratio2 = y2 / 960
+        crop_area_ratio = (x_ratio1, y_ratio1, (y2-y1)/960, y_ratio2 - y_ratio1)
+        print(f"Crop area ratio: {crop_area_ratio}")
         self.paused = False
 
     def calculate_crop_area_ratio(self):
