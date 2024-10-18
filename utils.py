@@ -30,11 +30,6 @@ def get_movie_info(subject_id):
         print(f"Failed to retrieve data from https://movie.douban.com/subject/{subject_id}/")
         return None
 
-movie_info = ''
-translate_system_prompt = Config.translate_prompt(movie_info=movie_info)
-messages = [{"role": "system", "content": translate_system_prompt}]
-
-
 
 def truncate_array(arr, num_tail_items=99):
     if not arr:
@@ -46,12 +41,16 @@ def truncate_array(arr, num_tail_items=99):
     truncated_arr = first_item + last_items if first_item != last_items[:1] else last_items
     return truncated_arr
 
-def translate_text_by_openai(text):
+messages = []
+def translate_text_by_openai(text,movie_info):
+    if not messages or len(messages) == 0:
+        translate_system_prompt = Config.translate_prompt(movie_info=movie_info)
+        messages.append({"role": "system", "content": translate_system_prompt})
+
     messages.append({"role": "user", "content": text})
-    truncate_message = truncate_array(messages)
     completion = client.chat.completions.create(
         model='gpt-4o-mini',
-        messages=truncate_message
+        messages=messages
     )
     translation = completion.choices[0].message.content
     messages.append({"role": "assistant", "content": translation})
