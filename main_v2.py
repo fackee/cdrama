@@ -5,13 +5,9 @@ import time
 from baidu_ocr import detect_subtitle_by_ocr
 import traceback
 
-def detect_subtitles(video_path,corp_area = (0, 0.61, 1, 0.14),frame_per_second = 1,concurrents = 16,queue_size = 2048):
-    """
-
-    """
+def detect_subtitles(video_path,corp_area = (0, 0.61, 1, 0.14),frame_per_second = 1,concurrents = 8):
     current_time = int(time.time())
-    frame_subtitles = detect_subtitle_by_ocr(video_path=video_path,frame_per_second=frame_per_second,corp_area=corp_area,concurrents=concurrents,queue_size=queue_size)
-    frame_subtitles.sort(key=lambda x: x[0])
+    frame_subtitles = detect_subtitle_by_ocr(video_path=video_path,frame_per_second=frame_per_second,corp_area=corp_area)
     current_subtitle = None
     start_time = None
     last_timestamp = 0
@@ -213,8 +209,8 @@ def start_all(directory):
         start_batch(directory=dir)
 
 
-
-video_path = '/Users/zhujianxin04/mini_drama/shcz/1.mp4'
-movie_info = '沈熹微死的那天，正好是裴云霄结婚的日子！裴云霄是沈家司机的儿子，沈熹微心疼他家境不好，让他和自己一起坐迈巴赫上学，给他刷自己的卡，送他昂贵的奢侈品，把父亲留下的公司给他。他花着她的钱，享受着她给的一切，却和别人谈着恋爱，把他的女朋友宠成公主，却把她当佣人使唤……她给他打电话，想让他给自己一点钱看病，他却残忍地道：“被你缠着的这些年，就是我的噩梦！沈熹微，你赶紧去死。”她死了！直到死的那一刻，才知道，那个曾经被自己拒绝的京圈太子爷，竟然一直在等着她……'
-# 示例使用
-start_single(video_path=video_path,movie_info=movie_info)
+if __name__ == '__main__': 
+    video_path = '/Users/zhujianxin04/mini_drama/shcz/1.mp4'
+    movie_info = '沈熹微死的那天，正好是裴云霄结婚的日子！裴云霄是沈家司机的儿子，沈熹微心疼他家境不好，让他和自己一起坐迈巴赫上学，给他刷自己的卡，送他昂贵的奢侈品，把父亲留下的公司给他。他花着她的钱，享受着她给的一切，却和别人谈着恋爱，把他的女朋友宠成公主，却把她当佣人使唤……她给他打电话，想让他给自己一点钱看病，他却残忍地道：“被你缠着的这些年，就是我的噩梦！沈熹微，你赶紧去死。”她死了！直到死的那一刻，才知道，那个曾经被自己拒绝的京圈太子爷，竟然一直在等着她……'
+    # 示例使用
+    start_single(video_path=video_path,movie_info=movie_info)

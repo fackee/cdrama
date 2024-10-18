@@ -1,11 +1,7 @@
 from paddleocr import PaddleOCR
 import cv2
 import time
-import queue
-import threading
-import concurrent
-
-lock = threading.Lock()
+import multiprocessing
 
 def is_chinese(text):
     """
@@ -34,16 +30,16 @@ def ocr_frame(ocr,frame, timestamp):
         text = '\n'.join([line[1][0] for line in result[0]])
         # 判断文字是否包含中文
         contains_chinese = is_chinese(text)
-        print(f"识别结果-{timestamp}: {text}")
         return text,contains_chinese
     return None, False
 
-def read_frames(video_path,frame_queue,frame_per_second = 16,crop_area = (),stop_signal = 16):
+def read_frames(video_path,frame_per_second = 16,crop_area = ()):
     """
     从视频捕获对象中读取帧并放入队列中
     :param frame_queue: 存储帧的队列
     :param crop_area: 裁剪区域
     """
+    frames = []
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_interval = int(fps / frame_per_second)
@@ -63,50 +59,52 @@ def read_frames(video_path,frame_queue,frame_per_second = 16,crop_area = (),stop
             height = int(h * crop_area[3])
             frame = frame[y:y+height, x:x+width]
         timestamp = frame_number*1000 / fps
-        frame_queue.put((timestamp, frame))
-    for _ in range(stop_signal):  # 向队列中放入结束信号
-        frame_queue.put(None)
-        # 释放视频捕获对象并关闭所有窗口
+        frames.append((timestamp, frame))
+    # 释放视频捕获对象并关闭所有窗口
     cap.release()
-    cv2.destroyAllWindows()
+    return frames
 
-def process_frames(orc,frame_queue, results):
+def process_frames(frames, result_list):
     """
     从队列中读取帧并进行 OCR 处理
     :param frame_queue: 存储帧的队列
-    :param results: 存储结果的列表
+    :param result_queue: 存储结果的列表
     """
-    while True:
-        item = frame_queue.get()
-        if item is None:
-            frame_queue.task_done()
-            break
-        timestamp, frame = item
+    orc = PaddleOCR(use_angle_cls=True, lang='ch', show_log=False)
+    for timestamp,frame in frames:
         ocr_text, contains_chinese = ocr_frame(orc,frame,timestamp)
-        with lock:
-            results.append((timestamp, ocr_text, contains_chinese))
-        frame_queue.task_done()
+        result_list.append((timestamp, ocr_text, contains_chinese))
+    print("process_frames finished")
 
-
-
-def detect_subtitle_by_ocr(video_path,frame_per_second = 10,corp_area = (0, 0.61, 1, 0.14),concurrents = 16,queue_size = 2048):
+def detect_subtitle_by_ocr(video_path,frame_per_second = 10,corp_area = (0, 0.61, 1, 0.14),concurrents = multiprocessing.cpu_count()):
     # 示例使用
-    crop_area = corp_area
-    frame_queue = queue.Queue(maxsize=queue_size)
-    results = []
     start_time = int(time.time())
-    # 启动帧读取线程
-    reader_thread = threading.Thread(target=read_frames, args=(video_path,frame_queue,frame_per_second,crop_area,concurrents))
-    reader_thread.start()
 
-    # 启动帧处理线程池
-    with concurrent.futures.ThreadPoolExecutor(max_workers=concurrents) as executor:
-        ocr_instances = [PaddleOCR(use_angle_cls=True, lang='ch', show_log=False) for _ in range(concurrents)]
-        futures = [executor.submit(process_frames, ocr_instances[i], frame_queue, results) for i in range(concurrents)]
+    # 启动帧读取
+    frames = read_frames(video_path=video_path,frame_per_second=frame_per_second,crop_area=corp_area)
 
-    reader_thread.join()
-    frame_queue.join()
-    # 等待所有处理线程完成
-    concurrent.futures.wait(futures)
+    # 启动帧处理进程池
+    manager = multiprocessing.Manager()
+    result_list = manager.list()
+    processes = []
+    k, m = divmod(len(frames), concurrents)
+    frame_slice = [frames[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(concurrents)]
+    print(f'total frame: {len(frames)}')
+    tf = 0
+    for sub_frame in frame_slice:
+        tf += len(sub_frame)
+        p = multiprocessing.Process(target=process_frames, args=(sub_frame, result_list))
+        p.start()
+        processes.append(p)
+
+    print(f'total sub frame: {tf}')
+
+    for p in processes:
+        p.join()
+
+    # 收集结果
+    results = list(result_list)
+    results.sort(key=lambda x: x[0])  # 根据 timestamp 排序
+
     print(f'ocr cost: {int(time.time()) - start_time}')
     return results
