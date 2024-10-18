@@ -26,7 +26,7 @@ def compress_and_encode_image(image):
     img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
     return img_str
 
-def extract_frames(video_path,frames_per_second=1,crop_area=(0, 0.61, 1, 0.14)):
+def extract_frames(video_path,frames_per_second=1,crop_area=(0, 0.61, 1, 0.16)):
     """
     提取关键帧和中间帧
     :param video_path: 视频路径
@@ -169,17 +169,65 @@ def embed_subtitle(video_path):
     subtitle_path = os.path.join(file_dir, base_name + '_subtitle.srt')
     embed_video_path = os.path.join(file_dir, base_name + '_embed.mp4')
     os.system(f"ffmpeg -i {video_path} -vf subtitles={subtitle_path} {embed_video_path}")
+    
 
 def start_single(video_path):
-    start_time = int(time.time())
-    frames, timestamps = extract_frames(video_path, frames_per_second=1)
-    subtitles = detect_subtitles(frames, timestamps)
-    backup_subtitles(video_path=video_path,subtitles=subtitles,translate=False)
-    translated_subtitles = translate_subtitles(subtitles=subtitles)
-    backup_subtitles(video_path=video_path,subtitles=translated_subtitles,translate=True)
-    write_subtitles(video_path=video_path,subtitles=translated_subtitles)
-    cvt_subtitle(video_path=video_path)
-    print(f'handle {video_path} cost: {int(time.time()) - start_time}')
+    try:
+        start_time = int(time.time())
+        # 存在字母，跳过
+        file_dir, file_name = os.path.split(video_path)
+        base_name, _ = os.path.splitext(file_name)
+        subtitle_file = os.path.join(file_dir, base_name + '_subtitle.srt')
+        if os.path.exists(subtitle_file):
+            print(f'{subtitle_file} exists, skip')
+            return
+        
+        # 存在翻译，直接写字幕
+        translate_file = os.path.join(file_dir, base_name + '_translate.txt')
+        if os.path.exists(translate_file):
+            translated_subtitles = []
+            with open(translate_file, 'r') as f:
+                content = f.read()
+                for line in content.split('\n'):
+                    if line.strip():
+                        time_arr = line.split(':')[0]
+                        start, end = time_arr.split('-')
+                        text = line.split(':')[1]
+                        translated_subtitles.append((float(start),float(end),text))
+                        print(f'{start}-{end}: {text}')
+            write_subtitles(video_path=video_path,subtitles=translated_subtitles)
+            print(f'{translate_file} exists, skip')
+            return
+        
+        # 提取帧，直接翻译
+        origin_file = os.path.join(file_dir, base_name + '_origin.txt')
+        if os.path.exists(origin_file):
+            subtitle = []
+            with open(origin_file, 'r') as f:
+                content = f.read()
+                for line in content.split('\n'):
+                    if line.strip():
+                        time_arr = line.split(':')[0]
+                        start, end = time_arr.split('-')
+                        text = line.split(':')[1]
+                        subtitle.append((start,end,text))
+                        print(f'{start}-{end}: {text}')
+            translated_subtitles = translate_subtitles(subtitles=subtitle)
+            backup_subtitles(video_path=video_path,subtitles=translated_subtitles,translate=True)
+            write_subtitles(video_path=video_path,subtitles=translated_subtitles)
+            print(f'{origin_file} exists, skip')
+            return
+
+        frames, timestamps = extract_frames(video_path, frames_per_second=8)
+        subtitles = detect_subtitles(frames, timestamps)
+        backup_subtitles(video_path=video_path,subtitles=subtitles,translate=False)
+        translated_subtitles = translate_subtitles(subtitles=subtitles)
+        backup_subtitles(video_path=video_path,subtitles=translated_subtitles,translate=True)
+        write_subtitles(video_path=video_path,subtitles=translated_subtitles)
+        #cvt_subtitle(video_path=video_path)
+        print(f'handle {video_path} cost: {int(time.time()) - start_time}')
+    except Exception as e:
+        print(f'handle {video_path} error',e)
 
 def start_batch(directory,extensions=['.mp4', '.avi', '.mkv', '.mov', '.flv']):
     video_files = []
@@ -191,7 +239,17 @@ def start_batch(directory,extensions=['.mp4', '.avi', '.mkv', '.mov', '.flv']):
     for video_path in video_files:
         start_single(video_path=video_path)
 
+def start_all(directory):
+    dir_all = []
+    for root, _, files in os.walk(directory):
+        for file in files:
+            # 判断文件是否是文件夹
+            if os.path.isdir(os.path.join(root, file)):
+                dir_all.append(os.path.join(root, file))
+    for dir in dir_all:
+        start_batch(directory=dir)
+
 
 
 # 示例使用
-start_batch('/Users/zhujianxin04/mini_drama/shcz')
+start_all('../../BaiduNetdiskDownload')
