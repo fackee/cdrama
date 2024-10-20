@@ -1,7 +1,9 @@
 from paddleocr import PaddleOCR
 import cv2
 import time
+from PIL import Image,ImageEnhance
 import multiprocessing
+import numpy as np
 
 def is_chinese(text):
     """
@@ -14,22 +16,29 @@ def is_chinese(text):
             return True
     return False
 
-def ocr_frame(ocr,frame, timestamp):
+def ocr_frame(ocr,frame,timestamp):
     """
     使用 OCR 识别视频帧中的文字，并判断是否包含中文
     :param frame: 视频帧（numpy 数组）
-    :param timestamp: 当前帧的时间戳
     :return: 识别的文字和是否包含中文的布尔值
     """
-    # 将视频帧转为灰度图像
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # 使用 PaddleOCR 进行 OCR 识别
-    result = ocr.ocr(gray, cls=True)
+    result = ocr.ocr(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     if result and result[0]:
         # 拼接识别的文字
-        text = '\n'.join([line[1][0] for line in result[0]])
+        text = ""
+        for line in result[0]:
+            t = line[1][0]
+            #left_top_y = line[0][0][1]
+            right_top_y = line[0][1][1]
+           # left_bottom_y = line[0][2][1]
+            right_bottom_y = line[0][3][1]
+            if right_bottom_y - right_top_y > 40:
+                text += t
         # 判断文字是否包含中文
         contains_chinese = is_chinese(text)
+        text = text.strip()
+        text = text.replace('\n', '')
         return text,contains_chinese
     return None, False
 
@@ -70,9 +79,9 @@ def process_frames(frames, result_list):
     :param frame_queue: 存储帧的队列
     :param result_queue: 存储结果的列表
     """
-    orc = PaddleOCR(use_angle_cls=True, lang='ch', show_log=False)
+    paddleocr = PaddleOCR(use_angle_cls=True,lang='ch', show_log=False,det_model_dir='.paddleocr\\whl\\det\\ch\\ch_PP-OCRv4_det_infer',rec_model_dir='.paddleocr\\whl\\rec\\ch\\ch_PP-OCRv4_rec_infer')
     for timestamp,frame in frames:
-        ocr_text, contains_chinese = ocr_frame(orc,frame,timestamp)
+        ocr_text, contains_chinese = ocr_frame(paddleocr,frame,timestamp)
         result_list.append((timestamp, ocr_text, contains_chinese))
     print("process_frames finished")
 
@@ -97,8 +106,6 @@ def detect_subtitle_by_ocr(video_path,frame_per_second = 10,corp_area = (0, 0.61
         p.start()
         processes.append(p)
 
-    print(f'total sub frame: {tf}')
-
     for p in processes:
         p.join()
 
@@ -108,3 +115,17 @@ def detect_subtitle_by_ocr(video_path,frame_per_second = 10,corp_area = (0, 0.61
 
     print(f'ocr cost: {int(time.time()) - start_time}')
     return results
+
+# paddleocr = PaddleOCR(lang='ch', show_log=False,
+#                       det_model_dir='.paddleocr\\whl\\det\\ch\\ch_PP-OCRv4_det_infer',
+#                       rec_model_dir='.paddleocr\\whl\\rec\\ch\\ch_PP-OCRv4_rec_infer')
+# img = cv2.imread('117120.0.jpg')  # 打开需要识别的图片
+# result = paddleocr.ocr(img)
+# for line in result[0]:
+#     t = line[1][0]
+#     print(t)
+#     left_top_y = line[0][0][1]
+#     right_top_y = line[0][1][1]
+#     left_bottom_y = line[0][2][1]
+#     right_bottom_y = line[0][3][1]
+#     print(left_top_y,right_top_y,left_bottom_y,right_bottom_y)

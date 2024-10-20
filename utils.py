@@ -40,17 +40,13 @@ def truncate_array(arr, num_tail_items=99):
         return arr
     truncated_arr = first_item + last_items if first_item != last_items[:1] else last_items
     return truncated_arr
-
-messages = []
-def translate_text_by_openai(text,movie_info):
-    if not messages or len(messages) == 0:
-        translate_system_prompt = Config.translate_prompt(movie_info=movie_info)
-        messages.append({"role": "system", "content": translate_system_prompt})
-
+def translate_text_by_openai(text,messages):
+    text = text.strip()
+    text = text.replace('\n', ' ')
     messages.append({"role": "user", "content": text})
     completion = client.chat.completions.create(
         model='gpt-4o-mini',
-        messages=messages
+        messages=truncate_array(messages,30)
     )
     translation = completion.choices[0].message.content
     messages.append({"role": "assistant", "content": translation})

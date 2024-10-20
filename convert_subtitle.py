@@ -1,7 +1,7 @@
 import re
 
 def srt_to_vtt(srt_path, vtt_path):
-    with open(srt_path, 'r', encoding='utf-8') as srt_file:
+    with open(srt_path, 'r',encoding='utf-8') as srt_file:
         srt_content = srt_file.read()
 
     # 替换时间格式
@@ -11,5 +11,7 @@ def srt_to_vtt(srt_path, vtt_path):
     vtt_content = 'WEBVTT\n\n' + vtt_content
 
     # 写入 WebVTT 文件
-    with open(vtt_path, 'w', encoding='utf-8') as vtt_file:
+    with open(vtt_path, 'w',encoding='utf-8') as vtt_file:
         vtt_file.write(vtt_content)
+
+# srt_to_vtt('../../BaiduNetdiskDownload/demo/1_subtitle.srt','../../BaiduNetdiskDownload/demo/1_subtitle.vtt')

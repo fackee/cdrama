@@ -4,8 +4,10 @@ from convert_subtitle import srt_to_vtt
 import time
 from baidu_ocr import detect_subtitle_by_ocr
 import traceback
+import re
+from config import Config
 
-def detect_subtitles(video_path,corp_area = (0, 0.61, 1, 0.14),frame_per_second = 1,concurrents = 8):
+def detect_subtitles(video_path,corp_area = (0, 0.73, 1, 0.074),frame_per_second = 10,concurrents = 8):
     current_time = int(time.time())
     frame_subtitles = detect_subtitle_by_ocr(video_path=video_path,frame_per_second=frame_per_second,corp_area=corp_area)
     current_subtitle = None
@@ -34,7 +36,6 @@ def detect_subtitles(video_path,corp_area = (0, 0.61, 1, 0.14),frame_per_second 
         end_time = last_timestamp
         subtitles.append((start_time, end_time, current_subtitle))
 
-    print(subtitles)
     print(f'detect subtile from cost: {int(time.time()) - current_time}')
     return subtitles
 
@@ -69,18 +70,18 @@ def merge_subtitles(subtitles):
 
     return merged_subtitles
 
-def translate_subtitles(subtitles,movie_info):
+def translate_subtitles(subtitles,messages):
+    subtitles = merge_subtitles(subtitles)
     start_time = int(time.time())
     translate_subtitles = []
     for start, end, subtitle in subtitles:
-        translate_subtitle = translate_text_by_openai(text=subtitle,movie_info=movie_info)
+        translate_subtitle = translate_text_by_openai(text=subtitle,messages=messages)
         print(f'translate {start}-{end}: {subtitle} --- {translate_subtitle}')
-        if translate_subtitle and len(translate_subtitle) > 0:
+        if translate_subtitle and len(translate_subtitle.strip()) > 0:
             translate_subtitles.append((start,end,translate_subtitle))
 
-    merged_subtitles = []
     print(f'translate subtitle from cost: {int(time.time()) - start_time}')
-    return merged_subtitles
+    return merge_subtitles(translate_subtitles)
 
 def format_time(milliseconds):
     """
@@ -101,7 +102,7 @@ def backup_subtitles(video_path,subtitles,translate = False):
         output_path = os.path.join(file_dir, base_name + '_translate.txt')
     else:
         output_path = os.path.join(file_dir, base_name + '_origin.txt')
-    with open(output_path, 'w') as file:
+    with open(output_path, 'w', encoding='utf-8') as file:
         for i, (start, end, subtitle) in enumerate(subtitles):
             file.write(f"{start}-{end}: {subtitle}\n")
 
@@ -109,7 +110,7 @@ def write_subtitles(video_path,subtitles):
     file_dir, file_name = os.path.split(video_path)
     base_name, _ = os.path.splitext(file_name)
     output_path = os.path.join(file_dir, base_name + '_subtitle.srt')
-    with open(output_path, 'w') as file:
+    with open(output_path, 'w',encoding='utf-8') as file:
         for i, (start, end, translated_text) in enumerate(subtitles):
             file.write(f"{i+1}\n")
             file.write(f"{format_time(start)} --> {format_time(end)}\n")
@@ -132,20 +133,27 @@ def embed_subtitle(video_path):
 
 def start_single(video_path,movie_info):
     try:
+        print(f'starting process video {video_path}')
+        translate_system_prompt = Config.translate_prompt(movie_info=movie_info)
+        messages = [{"role": "system", "content": translate_system_prompt}]
         start_time = int(time.time())
         # 存在字幕，跳过
         file_dir, file_name = os.path.split(video_path)
         base_name, _ = os.path.splitext(file_name)
         subtitle_file = os.path.join(file_dir, base_name + '_subtitle.srt')
         if os.path.exists(subtitle_file):
-            print(f'{subtitle_file} exists, skip')
-            return
+            content = ""
+            with open(subtitle_file, 'r',encoding='utf-8') as f:
+                content = f.read()
+            if len(content) > 10:
+                print(f'{subtitle_file} exists, skip')
+                return
         
         # 存在翻译，直接写字幕
         translate_file = os.path.join(file_dir, base_name + '_translate.txt')
         if os.path.exists(translate_file):
             translated_subtitles = []
-            with open(translate_file, 'r') as f:
+            with open(translate_file, 'r', encoding='utf-8') as f:
                 content = f.read()
                 for line in content.split('\n'):
                     if line.strip():
@@ -153,7 +161,6 @@ def start_single(video_path,movie_info):
                         start, end = time_arr.split('-')
                         text = line.split(':')[1]
                         translated_subtitles.append((float(start),float(end),text))
-                        print(f'{start}-{end}: {text}')
             write_subtitles(video_path=video_path,subtitles=translated_subtitles)
             print(f'{translate_file} exists, skip')
             return
@@ -162,7 +169,7 @@ def start_single(video_path,movie_info):
         origin_file = os.path.join(file_dir, base_name + '_origin.txt')
         if os.path.exists(origin_file):
             subtitle = []
-            with open(origin_file, 'r') as f:
+            with open(origin_file, 'r', encoding='utf-8') as f:
                 content = f.read()
                 for line in content.split('\n'):
                     if line.strip():
@@ -170,8 +177,7 @@ def start_single(video_path,movie_info):
                         start, end = time_arr.split('-')
                         text = line.split(':')[1]
                         subtitle.append((start,end,text))
-                        print(f'{start}-{end}: {text}')
-            translated_subtitles = translate_subtitles(subtitles=subtitle,movie_info=movie_info)
+            translated_subtitles = translate_subtitles(subtitles=subtitle,messages=messages)
             backup_subtitles(video_path=video_path,subtitles=translated_subtitles,translate=True)
             write_subtitles(video_path=video_path,subtitles=translated_subtitles)
             print(f'{origin_file} exists, skip')
@@ -179,24 +185,32 @@ def start_single(video_path,movie_info):
 
         subtitles = detect_subtitles(video_path)
         backup_subtitles(video_path=video_path,subtitles=subtitles,translate=False)
-        translated_subtitles = translate_subtitles(subtitles=subtitles,movie_info=movie_info)
+        translated_subtitles = translate_subtitles(subtitles=subtitles,messages=messages)
         backup_subtitles(video_path=video_path,subtitles=translated_subtitles,translate=True)
         write_subtitles(video_path=video_path,subtitles=translated_subtitles)
         cvt_subtitle(video_path=video_path)
         print(f'handle {video_path} cost: {int(time.time()) - start_time}')
     except Exception as e:
-        print(f'handle {video_path} error',e)
+        print(f'handle error: {video_path}',e)
         traceback.print_exc()
 
-def start_batch(directory,extensions=['.mp4', '.avi', '.mkv', '.mov', '.flv']):
+# 定义一个函数来提取文件名中的数字
+def extract_number(file_path):
+    base_name = os.path.basename(file_path)
+    match = re.search(r'(\d+)', base_name)
+    if match:
+        return int(match.group(1))
+    return 0  # 如果没有找到数字，默认返回0
+
+def start_batch(directory,video_info,extensions=['.mp4', '.avi', '.mkv', '.mov', '.flv']):
     video_files = []
     for root, _, files in os.walk(directory):
         for file in files:
             if any(file.lower().endswith(ext) for ext in extensions):
                 video_files.append(os.path.join(root, file))
-    video_files.sort(key=lambda x: os.path.basename(x).lower())
+    video_files.sort(key=extract_number)
     for video_path in video_files:
-        start_single(video_path=video_path)
+        start_single(video_path=video_path,movie_info=video_info)
 
 def start_all(directory):
     dir_all = []
@@ -210,7 +224,6 @@ def start_all(directory):
 
 
 if __name__ == '__main__': 
-    video_path = '/Users/zhujianxin04/mini_drama/shcz/1.mp4'
-    movie_info = '沈熹微死的那天，正好是裴云霄结婚的日子！裴云霄是沈家司机的儿子，沈熹微心疼他家境不好，让他和自己一起坐迈巴赫上学，给他刷自己的卡，送他昂贵的奢侈品，把父亲留下的公司给他。他花着她的钱，享受着她给的一切，却和别人谈着恋爱，把他的女朋友宠成公主，却把她当佣人使唤……她给他打电话，想让他给自己一点钱看病，他却残忍地道：“被你缠着的这些年，就是我的噩梦！沈熹微，你赶紧去死。”她死了！直到死的那一刻，才知道，那个曾经被自己拒绝的京圈太子爷，竟然一直在等着她……'
-    # 示例使用
-    start_single(video_path=video_path,movie_info=movie_info)
+    video_path = '../../BaiduNetdiskDownload/woman_king'
+    movie_info = '商业新秀许安生穿越到桃园县五年，把治下打造成世外桃源却拒不缴纳朝廷赋税，引来女帝微服私访、讨要税银。发现了许安生的能力，想要扶持桃源县却被反派安乐侯一路暗杀。'
+    start_batch(directory=video_path,video_info=movie_info)
