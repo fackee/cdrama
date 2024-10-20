@@ -3,3 +3,6 @@
 /__pycache__
 *.log
 /youtube_uploader_selenium/__pycache__
+config.py
+token.json
+client_secret.json
