@@ -6,3 +6,8 @@
 config.py
 token.json
 client_secret.json
+.DS_Store
+asserts/.DS_Store
+/models
+.DS_Store
+asserts/.DS_Store

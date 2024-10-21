@@ -4,6 +4,7 @@ import time
 from PIL import Image,ImageEnhance
 import multiprocessing
 import numpy as np
+import os
 
 def is_chinese(text):
     """
@@ -16,12 +17,36 @@ def is_chinese(text):
             return True
     return False
 
+def orc_image(image_path):
+    paddleocr = PaddleOCR(use_angle_cls=False,lang='ch', show_log=False,det_model_dir='./models/ch_PP-OCRv4_det_server_infer',rec_model_dir='./models/ch_PP-OCRv4_rec_server_infer')
+    #sr_image = super_resolution(image_path)
+    img = cv2.imread(image_path)
+    result = paddleocr.ocr(img)
+    if result and result[0]:
+        # 拼接识别的文字
+        text = ""
+        for line in result[0]:
+            t = line[1][0]
+            #left_top_y = line[0][0][1]
+            right_top_y = line[0][1][1]
+           # left_bottom_y = line[0][2][1]
+            right_bottom_y = line[0][3][1]
+            if right_bottom_y - right_top_y > 40:
+                text += t
+        text = text.strip()
+        text = text.replace('\n', '')
+        print(text)
+
 def ocr_frame(ocr,frame,timestamp):
     """
     使用 OCR 识别视频帧中的文字，并判断是否包含中文
     :param frame: 视频帧（numpy 数组）
     :return: 识别的文字和是否包含中文的布尔值
     """
+    output_path =f"asserts/samples/{timestamp}.jpg"
+        
+     # 保存帧为图片
+    cv2.imwrite(output_path, frame)
     # 使用 PaddleOCR 进行 OCR 识别
     result = ocr.ocr(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     if result and result[0]:
@@ -79,7 +104,7 @@ def process_frames(frames, result_list):
     :param frame_queue: 存储帧的队列
     :param result_queue: 存储结果的列表
     """
-    paddleocr = PaddleOCR(use_angle_cls=True,lang='ch', show_log=False,det_model_dir='.paddleocr\\whl\\det\\ch\\ch_PP-OCRv4_det_infer',rec_model_dir='.paddleocr\\whl\\rec\\ch\\ch_PP-OCRv4_rec_infer')
+    paddleocr = PaddleOCR(use_angle_cls=True,lang='ch', show_log=False,det_model_dir='./modes/ch_ppocr_server_v2.0_det_infer',rec_model_dir='./modes/ch_ppocr_server_v2.0_rec_infer')
     for timestamp,frame in frames:
         ocr_text, contains_chinese = ocr_frame(paddleocr,frame,timestamp)
         result_list.append((timestamp, ocr_text, contains_chinese))
@@ -129,3 +154,7 @@ def detect_subtitle_by_ocr(video_path,frame_per_second = 10,corp_area = (0, 0.61
 #     left_bottom_y = line[0][2][1]
 #     right_bottom_y = line[0][3][1]
 #     print(left_top_y,right_top_y,left_bottom_y,right_bottom_y)
+
+
+# for i in range(2):
+#     orc_image('asserts/samples/sr.jpg')

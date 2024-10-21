@@ -1,5 +1,5 @@
 import os
-from utils import translate_text_by_openai
+from utils import translate_text_by_openai,translate_text_by_openai_v2,correct_subtitle_by_openai
 from convert_subtitle import srt_to_vtt
 import time
 from baidu_ocr import detect_subtitle_by_ocr
@@ -83,6 +83,36 @@ def translate_subtitles(subtitles,messages):
     print(f'translate subtitle from cost: {int(time.time()) - start_time}')
     return merge_subtitles(translate_subtitles)
 
+
+def translate_subtitles_v2(movie_info,subtitles):
+    subtitles = merge_subtitles(subtitles)
+    start_time = int(time.time())
+    translate_subtitles = []
+    origin_subtitle_content = ""
+    for start, end, subtitle in subtitles:
+        origin_subtitle_content += f'{start}-{end}: {subtitle}\n'
+    corrected_subtitle_content = correct_subtitle_by_openai(movie_info,origin_subtitle_content)
+    corrected_subtitle_content = corrected_subtitle_content.replace('```','')
+    translated_subtitle_content = translate_text_by_openai_v2(movie_info,corrected_subtitle_content)
+    translated_subtitle_content = translated_subtitle_content.replace('```','')
+    translated_subtitle_content_arr = translated_subtitle_content.split('\n')
+    for ts in translated_subtitle_content_arr:
+        ts_arr = ts.split(':')
+        if len(ts_arr) != 2:
+            continue
+        time_content = ts_arr[0]
+        time_arr = time_content.split('-')
+        if len(time_arr) != 2:
+            continue
+        start = float(time_arr[0])
+        end = float(time_arr[1])
+        text = ts_arr[1]
+        translate_subtitles.append((start,end,text))
+    print(translate_subtitles)
+    print(f'translate subtitle from cost: {int(time.time()) - start_time}')
+    return merge_subtitles(translate_subtitles)
+
+
 def format_time(milliseconds):
     """
     将毫秒转换为SRT格式的时间字符串
@@ -112,6 +142,7 @@ def write_subtitles(video_path,subtitles):
     output_path = os.path.join(file_dir, base_name + '_subtitle.srt')
     with open(output_path, 'w',encoding='utf-8') as file:
         for i, (start, end, translated_text) in enumerate(subtitles):
+            print(f'{start}-{end}: {translated_text}')
             file.write(f"{i+1}\n")
             file.write(f"{format_time(start)} --> {format_time(end)}\n")
             file.write(f"{translated_text}\n\n")
@@ -177,7 +208,7 @@ def start_single(video_path,movie_info):
                         start, end = time_arr.split('-')
                         text = line.split(':')[1]
                         subtitle.append((start,end,text))
-            translated_subtitles = translate_subtitles(subtitles=subtitle,messages=messages)
+            translated_subtitles = translate_subtitles_v2(movie_info=movie_info,subtitles=subtitle)
             backup_subtitles(video_path=video_path,subtitles=translated_subtitles,translate=True)
             write_subtitles(video_path=video_path,subtitles=translated_subtitles)
             print(f'{origin_file} exists, skip')
@@ -185,10 +216,10 @@ def start_single(video_path,movie_info):
 
         subtitles = detect_subtitles(video_path)
         backup_subtitles(video_path=video_path,subtitles=subtitles,translate=False)
-        translated_subtitles = translate_subtitles(subtitles=subtitles,messages=messages)
-        backup_subtitles(video_path=video_path,subtitles=translated_subtitles,translate=True)
-        write_subtitles(video_path=video_path,subtitles=translated_subtitles)
-        cvt_subtitle(video_path=video_path)
+        # translated_subtitles = translate_subtitles(subtitles=subtitles,messages=messages)
+        # backup_subtitles(video_path=video_path,subtitles=translated_subtitles,translate=True)
+        # write_subtitles(video_path=video_path,subtitles=translated_subtitles)
+        # cvt_subtitle(video_path=video_path)
         print(f'handle {video_path} cost: {int(time.time()) - start_time}')
     except Exception as e:
         print(f'handle error: {video_path}',e)
@@ -224,6 +255,6 @@ def start_all(directory):
 
 
 if __name__ == '__main__': 
-    video_path = '../../BaiduNetdiskDownload/woman_king'
+    video_path = '/Users/zhujianxin04/mini_drama/wk/1.mp4'
     movie_info = '商业新秀许安生穿越到桃园县五年，把治下打造成世外桃源却拒不缴纳朝廷赋税，引来女帝微服私访、讨要税银。发现了许安生的能力，想要扶持桃源县却被反派安乐侯一路暗杀。'
-    start_batch(directory=video_path,video_info=movie_info)
+    start_single(video_path=video_path,movie_info=movie_info)

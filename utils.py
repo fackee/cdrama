@@ -52,6 +52,38 @@ def translate_text_by_openai(text,messages):
     messages.append({"role": "assistant", "content": translation})
     return translation
 
+
+def correct_subtitle_by_openai(movie_info,text):
+    prompt = Config.correct_subtitle_prompt(movie_info,text)
+    completion = client.chat.completions.create(
+        model='gpt-4o-mini',
+        messages=[ 
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+    )
+    translation = completion.choices[0].message.content
+    print(f"correct subtitle result: {translation}")
+    return translation
+
+def translate_text_by_openai_v2(movie_info,text):
+    prompt = Config.new_translate_prompt(movie_info,text)
+    completion = client.chat.completions.create(
+        model='gpt-4o-mini',
+        messages=[ 
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+    )
+    translation = completion.choices[0].message.content
+    print(f"translate v2 result: {translation}")
+    return translation
+
+
 def frame_to_base64(frame,compress_rate = 50):
     encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), compress_rate]  # 90表示压缩质量
     result, encimg = cv2.imencode('.jpg', frame, encode_param)
